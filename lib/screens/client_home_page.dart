@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../services/location_service.dart';
+import '../services/google_places_service.dart';
+import 'package:location/location.dart';
 import 'dart:math' show cos, sqrt, asin;
 
 class ClientHomePage extends StatefulWidget {
@@ -19,6 +21,14 @@ class _ClientHomePageState extends State<ClientHomePage> {
   Set<Marker> markers = {};
   late GoogleMapController mapController;
 
+  String formatDistance(double meters) {
+  if (meters < 1000) {
+    return '${meters.toStringAsFixed(0)} m';
+  }
+  return '${(meters / 1000).toStringAsFixed(1)} km';
+}
+
+
   @override
   void initState() {
     super.initState();
@@ -27,34 +37,44 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
   Future<void> _initLocationAndPharmacies() async {
     try {
-      // 1️⃣ Get user location
-      userLocation = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+      // Get LocationData from LocationService
+      LocationData? locationData = await LocationService.getCurrentLocation();
 
-      // 2️⃣ Fetch pharmacies from Firestore
-      var snapshot = await FirebaseFirestore.instance
-          .collection('pharmacies')
-          .get();
+      if (locationData == null || locationData.latitude == null || locationData.longitude == null) {
+        throw Exception('Unable to get current location');
+      }
 
-      pharmacies = snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['lat'] = (data['lat'] ?? 0).toDouble();
-        data['lng'] = (data['lng'] ?? 0).toDouble();
-        return data;
-      }).toList();
+      // Convert LocationData to Position
+      userLocation = Position(
+  latitude: locationData.latitude!,
+  longitude: locationData.longitude!,
+  timestamp: DateTime.now(),
+  accuracy: locationData.accuracy ?? 0.0,
+  altitude: locationData.altitude ?? 0.0,
+  altitudeAccuracy: 0.0,       // <- add this
+  heading: locationData.heading ?? 0.0,
+  headingAccuracy: 0.0,        // <- add this
+  speed: locationData.speed ?? 0.0,
+  speedAccuracy: 0.0,
+);
+
+      // Fetch nearby pharmacies
+      pharmacies = await GooglePlacesService.getNearbyPharmacies(
+        userLocation!.latitude,
+        userLocation!.longitude,
+      );
 
       _updateMarkers();
     } catch (e) {
-      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     } finally {
-      setState(() {
-        loading = false;
-      });
+      setState(() => loading = false);
     }
   }
 
   void _updateMarkers() {
-    // Filter by search query
     final filtered = filteredPharmacies;
     markers = filtered.map((pharmacy) {
       return Marker(
@@ -67,11 +87,14 @@ class _ClientHomePageState extends State<ClientHomePage> {
             pharmacy['open'] ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed),
       );
     }).toSet();
+
+    setState(() {});
   }
 
   List<Map<String, dynamic>> get filteredPharmacies {
-    if (searchQuery.isEmpty) return pharmaciesWithDistance;
-    return pharmaciesWithDistance.where((pharmacy) {
+    final withDistance = pharmaciesWithDistance;
+    if (searchQuery.isEmpty) return withDistance;
+    return withDistance.where((pharmacy) {
       final medicines = pharmacy['medicines'] as List<dynamic>;
       return medicines.any((med) =>
           med['name'].toString().toLowerCase().contains(searchQuery.toLowerCase()));
@@ -93,16 +116,12 @@ class _ClientHomePageState extends State<ClientHomePage> {
       ..sort((a, b) => a['distance'].compareTo(b['distance']));
   }
 
-  double _calculateDistance(
-      double lat1, double lon1, double lat2, double lon2) {
-    // Approximate distance in meters (Haversine)
-    const p = 0.017453292519943295; // pi /180
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const p = 0.017453292519943295; // pi/180
     final a = 0.5 -
         cos((lat2 - lat1) * p) / 2 +
-        cos(lat1 * p) *
-            cos(lat2 * p) *
-            (1 - cos((lon2 - lon1) * p)) / 2;
-    return 12742000 * asin(sqrt(a)); // 2*R*asin
+        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
+    return 12742000 * asin(sqrt(a)); // distance in meters
   }
 
   @override
@@ -119,17 +138,15 @@ class _ClientHomePageState extends State<ClientHomePage> {
         children: [
           // Search bar
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(8.0),
             child: TextField(
               decoration: const InputDecoration(
                 hintText: 'Search medicine...',
                 border: OutlineInputBorder(),
               ),
               onChanged: (value) {
-                setState(() {
-                  searchQuery = value;
-                  _updateMarkers();
-                });
+                searchQuery = value;
+                _updateMarkers();
               },
             ),
           ),
@@ -148,7 +165,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 8.0),
 
           // List of pharmacies
           Expanded(
@@ -156,19 +173,26 @@ class _ClientHomePageState extends State<ClientHomePage> {
               itemCount: filteredPharmacies.length,
               itemBuilder: (context, index) {
                 final pharmacy = filteredPharmacies[index];
-                return ListTile(
-                  title: Text(pharmacy['name']),
-                  subtitle: Text(
-                      '${pharmacy['distance'].toStringAsFixed(0)} m away - ${pharmacy['open'] ? 'Open' : 'Closed'}'),
-                  trailing: Icon(
-                    pharmacy['open'] ? Icons.check_circle : Icons.cancel,
-                    color: pharmacy['open'] ? Colors.green : Colors.red,
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: ListTile(
+                    title: Text(pharmacy['name']),
+                    subtitle:  Text(
+  '${formatDistance(pharmacy['distance'])} • '
+  '${pharmacy['open'] ? 'Open now' : 'Closed'}',
+),
+
+                    trailing: Icon(
+                      pharmacy['open'] ? Icons.check_circle : Icons.cancel,
+                      color: pharmacy['open'] ? Colors.green : Colors.red,
+                    ),
+                    onTap: () {
+                      mapController.animateCamera(
+                        CameraUpdate.newLatLng(
+                            LatLng(pharmacy['lat'], pharmacy['lng'])),
+                      );
+                    },
                   ),
-                  onTap: () {
-                    // Move map to marker
-                    mapController.animateCamera(CameraUpdate.newLatLng(
-                        LatLng(pharmacy['lat'], pharmacy['lng'])));
-                  },
                 );
               },
             ),
