@@ -5,6 +5,8 @@ import 'package:pharmacie/register.dart';
 import 'package:pharmacie/situation.dart';
 
 class Signin extends StatelessWidget {
+  const Signin({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,6 +18,8 @@ class Signin extends StatelessWidget {
 }
 
 class Signin2 extends StatefulWidget {
+  const Signin2({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -158,13 +162,6 @@ class _LoginPageState extends State<Signin2> {
                             // زر تسجيل الدخول
                             ElevatedButton(
                               onPressed: _login,
-                              child: Text(
-                                'Sign in',
-                                style: GoogleFonts.aBeeZee(
-                                  fontSize: 18,
-                                  color: Colors.indigo[50],
-                                ),
-                              ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.indigo[400],
                                 padding: EdgeInsets.symmetric(
@@ -173,6 +170,13 @@ class _LoginPageState extends State<Signin2> {
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Sign in',
+                                style: GoogleFonts.aBeeZee(
+                                  fontSize: 18,
+                                  color: Colors.indigo[50],
                                 ),
                               ),
                             ),

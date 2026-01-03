@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class Add_information_client extends StatelessWidget {
+  const Add_information_client({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,6 +18,8 @@ class Add_information_client extends StatelessWidget {
 }
 
 class Add_information_client2 extends StatefulWidget {
+  const Add_information_client2({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }

@@ -5,6 +5,8 @@ import 'client_search.dart';
 import 'pharmacy_medicines.dart';
 
 class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }

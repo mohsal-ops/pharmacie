@@ -1,0 +1,20 @@
+[debug] [2026-01-03T01:14:05.896Z] ----------------------------------------------------------------------
+[debug] [2026-01-03T01:14:05.899Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\user\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js projects:create pharmacie --json
+[debug] [2026-01-03T01:14:05.899Z] CLI Version:   13.11.2
+[debug] [2026-01-03T01:14:05.900Z] Platform:      win32
+[debug] [2026-01-03T01:14:05.900Z] Node Version:  v20.13.0
+[debug] [2026-01-03T01:14:05.900Z] Time:          Sat Jan 03 2026 02:14:05 GMT+0100 (GMT+01:00)
+[debug] [2026-01-03T01:14:05.900Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-01-03T01:14:05.908Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-03T01:14:05.909Z] > authorizing via signed-in user (bensa0016@gmail.com)
+[debug] [2026-01-03T01:14:05.913Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects [none]
+[debug] [2026-01-03T01:14:05.914Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"projectId":"pharmacie","name":"pharmacie"}
+[debug] [2026-01-03T01:14:08.269Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects 409
+[debug] [2026-01-03T01:14:08.269Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects {"error":{"code":409,"message":"Requested entity already exists","status":"ALREADY_EXISTS"}}
+[debug] [2026-01-03T01:14:08.278Z] FirebaseError: HTTP Error: 409, Requested entity already exists
+    at responseToError (C:\Users\user\AppData\Roaming\npm\node_modules\firebase-tools\lib\responseToError.js:49:12)
+    at RetryOperation._fn (C:\Users\user\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:305:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] 
+[error] Error: Failed to create project because there is already a project with ID pharmacie. Please try again with a unique project ID.

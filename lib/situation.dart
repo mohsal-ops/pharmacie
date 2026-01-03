@@ -8,6 +8,8 @@ import 'package:pharmacie/Add_information_client.dart';
 import 'package:pharmacie/add_information_pharmacy.dart';
 
 class Situation extends StatelessWidget {
+  const Situation({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -20,6 +22,8 @@ class Situation extends StatelessWidget {
 }
 
 class Situation2 extends StatefulWidget {
+  const Situation2({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }

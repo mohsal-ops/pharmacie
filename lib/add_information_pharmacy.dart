@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 
 class Add_information_pharmacy extends StatelessWidget {
+  const Add_information_pharmacy({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,6 +20,8 @@ class Add_information_pharmacy extends StatelessWidget {
 }
 
 class Add_information_pharmacy2 extends StatefulWidget {
+  const Add_information_pharmacy2({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }

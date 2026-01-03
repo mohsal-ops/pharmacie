@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class PharmacyMedicinesPage extends StatefulWidget {
+  const PharmacyMedicinesPage({super.key});
+
   @override
   State<PharmacyMedicinesPage> createState() => _PharmacyMedicinesPageState();
 }
