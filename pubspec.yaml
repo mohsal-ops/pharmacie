@@ -8,6 +8,7 @@ environment:
   sdk: ^3.10.4
 
 dependencies:
+  intl: ^0.18.1
   location: 8.0.1
   http: ^1.2.0
   google_maps_flutter: ^2.3.0
