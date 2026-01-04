@@ -4,7 +4,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:math' as math;
 import 'package:intl/intl.dart';
 
-
 class ClientHomePage extends StatefulWidget {
   const ClientHomePage({super.key});
 
@@ -19,7 +18,6 @@ class _ClientHomePageState extends State<ClientHomePage> {
   Set<Marker> markers = {};
   late GoogleMapController mapController;
 
-  // Fake pharmacy data for testing
   List<Map<String, dynamic>> pharmacies = [
     {
       'name': 'Pharmacy El-Amal',
@@ -51,8 +49,6 @@ class _ClientHomePageState extends State<ClientHomePage> {
   }
 
   Future<void> _detectLocation() async {
-    setState(() => loading = true);
-
     try {
       // Request permission
       LocationPermission permission = await Geolocator.checkPermission();
@@ -67,7 +63,20 @@ class _ClientHomePageState extends State<ClientHomePage> {
       userLocation = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      // Add marker for user location
+      // Calculate distance and open status for pharmacies
+      for (var pharmacy in pharmacies) {
+        pharmacy['distance'] = _calculateDistance(
+          userLocation!.latitude,
+          userLocation!.longitude,
+          pharmacy['lat'],
+          pharmacy['lng'],
+        );
+        pharmacy['open'] = _isPharmacyOpen(pharmacy['workingHours']);
+      }
+
+      // Add markers
+      markers.clear();
+      // User marker
       markers.add(Marker(
         markerId: const MarkerId('user_location'),
         position: LatLng(userLocation!.latitude, userLocation!.longitude),
@@ -75,8 +84,20 @@ class _ClientHomePageState extends State<ClientHomePage> {
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
       ));
 
-      // Add markers for pharmacies
-      _updatePharmacyMarkers();
+      // Pharmacy markers
+      for (var pharmacy in pharmacies) {
+        markers.add(Marker(
+          markerId: MarkerId(pharmacy['name']),
+          position: LatLng(pharmacy['lat'], pharmacy['lng']),
+          infoWindow: InfoWindow(
+            title: pharmacy['name'],
+            snippet: pharmacy['open'] ? 'Open' : 'Closed',
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+              pharmacy['open'] ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed),
+        ));
+      }
+
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.toString())));
@@ -85,40 +106,14 @@ class _ClientHomePageState extends State<ClientHomePage> {
     }
   }
 
-  void _updatePharmacyMarkers() {
-    for (var pharmacy in pharmacies) {
-      final open = _isPharmacyOpen(pharmacy['workingHours']);
-      pharmacy['open'] = open;
-      pharmacy['distance'] = _calculateDistance(
-        userLocation!.latitude,
-        userLocation!.longitude,
-        pharmacy['lat'],
-        pharmacy['lng'],
-      );
-
-      markers.add(Marker(
-        markerId: MarkerId(pharmacy['name']),
-        position: LatLng(pharmacy['lat'], pharmacy['lng']),
-        infoWindow: InfoWindow(
-          title: pharmacy['name'],
-          snippet: open ? 'Open' : 'Closed',
-        ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-            open ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed),
-      ));
-    }
-  }
-
   bool _isPharmacyOpen(Map<String, String> hours) {
     final now = DateTime.now();
     final start = DateFormat('HH:mm').parse(hours['start']!);
     final end = DateFormat('HH:mm').parse(hours['end']!);
-
     final startTime =
         DateTime(now.year, now.month, now.day, start.hour, start.minute);
     final endTime =
         DateTime(now.year, now.month, now.day, end.hour, end.minute);
-
     return now.isAfter(startTime) && now.isBefore(endTime);
   }
 
@@ -171,18 +166,16 @@ class _ClientHomePageState extends State<ClientHomePage> {
             ),
           ),
 
-          // Small map with user location
+          // Map showing user + pharmacies
           SizedBox(
-            height: 200,
+            height: 250,
             child: GoogleMap(
               initialCameraPosition: CameraPosition(
-                  target:
-                      LatLng(userLocation!.latitude, userLocation!.longitude),
-                  zoom: 14),
+                target: LatLng(userLocation!.latitude, userLocation!.longitude),
+                zoom: 14,
+              ),
               myLocationEnabled: true,
-              markers: markers
-                  .where((m) => m.markerId.value == 'user_location')
-                  .toSet(),
+              markers: markers,
               onMapCreated: (controller) => mapController = controller,
             ),
           ),
