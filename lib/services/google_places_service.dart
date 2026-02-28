@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class GooglePlacesService {
-  static const String _apiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
+  static const String _apiKey = 'AIzaSyBHC2bxtnX78DbnetLdQ_ZEAIxEZsDT_9M';
 
   static Future<List<Map<String, dynamic>>> getNearbyPharmacies(
       double lat, double lng) async {

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'client_search.dart';
-import 'pharmacy_medicines.dart';
+import 'client_home_page.dart';
+import 'pharmacy_dashboard.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -12,42 +12,35 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final uid = FirebaseAuth.instance.currentUser!.uid;
-  String role = '';
-  String name = '';
+  String? role;
 
   @override
   void initState() {
     super.initState();
-    loadProfile();
+    loadRole();
   }
 
-  void loadProfile() async {
-    var doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    if (doc.exists) {
-      setState(() {
-        role = doc['role'] ?? '';
-        name = doc['name'] ?? '';
-      });
-    }
-  }
+  Future<void> loadRole() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
-  void logout() async {
-    await FirebaseAuth.instance.signOut();
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+    setState(() {
+      role = doc['role'];
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Welcome $name'),
-        actions: [IconButton(icon: Icon(Icons.logout), onPressed: logout)],
-      ),
-      body: Center(
-        child: role == 'client'
-            ? ClientSearchPage()
-            : PharmacyMedicinesPage(),
-      ),
-    );
+    if (role == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (role == 'client') {
+      return const ClientHomePage();
+    } else {
+      return const PharmacyDashboard();
+    }
   }
 }

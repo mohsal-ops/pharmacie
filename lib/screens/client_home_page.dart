@@ -1,8 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'dart:math' as math;
-import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import '../services/location_service.dart';
+import '../services/google_places_service.dart';
 
 class ClientHomePage extends StatefulWidget {
   const ClientHomePage({super.key});
@@ -12,200 +13,110 @@ class ClientHomePage extends StatefulWidget {
 }
 
 class _ClientHomePageState extends State<ClientHomePage> {
-  Position? userLocation;
-  bool loading = true;
-  String searchQuery = '';
-  Set<Marker> markers = {};
-  late GoogleMapController mapController;
-
-  List<Map<String, dynamic>> pharmacies = [
-    {
-      'name': 'Pharmacy El-Amal',
-      'address': '123 Main Street',
-      'lat': 36.7538,
-      'lng': 3.0588,
-      'workingHours': {'start': '08:00', 'end': '20:00'},
-    },
-    {
-      'name': 'Pharmacy Santé',
-      'address': '456 Center Road',
-      'lat': 36.7560,
-      'lng': 3.0620,
-      'workingHours': {'start': '09:00', 'end': '18:00'},
-    },
-    {
-      'name': 'Pharmacy Horizon',
-      'address': '789 City Ave',
-      'lat': 36.7540,
-      'lng': 3.0550,
-      'workingHours': {'start': '07:30', 'end': '21:00'},
-    },
-  ];
+  GoogleMapController? mapController;
+  LatLng? userLocation;
+  final Set<Marker> markers = {};
+  final List<Map<String, dynamic>> pharmacies = [];
 
   @override
   void initState() {
     super.initState();
-    _detectLocation();
+    loadLocation();
   }
 
-  Future<void> _detectLocation() async {
-    try {
-      // Request permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Location permission denied');
-        }
-      }
+  Future<void> loadLocation() async {
+    Position pos = await LocationService.getUserLocation();
 
-      // Get current position
-      userLocation = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+    setState(() {
+      userLocation = LatLng(pos.latitude, pos.longitude);
+      markers.add(
+        Marker(
+          markerId: const MarkerId("me"),
+          position: userLocation!,
+          infoWindow: const InfoWindow(title: "You"),
+        ),
+      );
+    });
 
-      // Calculate distance and open status for pharmacies
-      for (var pharmacy in pharmacies) {
-        pharmacy['distance'] = _calculateDistance(
-          userLocation!.latitude,
-          userLocation!.longitude,
-          pharmacy['lat'],
-          pharmacy['lng'],
-        );
-        pharmacy['open'] = _isPharmacyOpen(pharmacy['workingHours']);
-      }
+    fetchNearbyPharmacies();
+  }
 
-      // Add markers
-      markers.clear();
-      // User marker
-      markers.add(Marker(
-        markerId: const MarkerId('user_location'),
-        position: LatLng(userLocation!.latitude, userLocation!.longitude),
-        infoWindow: const InfoWindow(title: 'You are here'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-      ));
+  void fetchNearbyPharmacies() async {
+    final results = await GooglePlacesService.getNearbyPharmacies(
+      userLocation!.latitude,
+      userLocation!.longitude,
+    );
 
-      // Pharmacy markers
-      for (var pharmacy in pharmacies) {
-        markers.add(Marker(
-          markerId: MarkerId(pharmacy['name']),
-          position: LatLng(pharmacy['lat'], pharmacy['lng']),
-          infoWindow: InfoWindow(
-            title: pharmacy['name'],
-            snippet: pharmacy['open'] ? 'Open' : 'Closed',
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-              pharmacy['open'] ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed),
-        ));
-      }
+    print(results);
+    pharmacies.clear();
+    markers.clear();
 
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
-    } finally {
-      setState(() => loading = false);
+    markers.add(
+      Marker(
+        markerId: const MarkerId("me"),
+        position: userLocation!,
+        infoWindow: const InfoWindow(title: "You"),
+      ),
+    );
+
+    for (var p in results) {
+      double distance =
+          Geolocator.distanceBetween(
+            userLocation!.latitude,
+            userLocation!.longitude,
+            p["lat"],
+            p["lng"],
+          ) /
+          1000;
+
+      pharmacies.add({...p, "distance": distance});
+
+      markers.add(
+        Marker(
+          markerId: MarkerId(p["placeId"]),
+          position: LatLng(p["lat"], p["lng"]),
+          infoWindow: InfoWindow(title: p["name"]),
+        ),
+      );
     }
-  }
 
-  bool _isPharmacyOpen(Map<String, String> hours) {
-    final now = DateTime.now();
-    final start = DateFormat('HH:mm').parse(hours['start']!);
-    final end = DateFormat('HH:mm').parse(hours['end']!);
-    final startTime =
-        DateTime(now.year, now.month, now.day, start.hour, start.minute);
-    final endTime =
-        DateTime(now.year, now.month, now.day, end.hour, end.minute);
-    return now.isAfter(startTime) && now.isBefore(endTime);
-  }
+    pharmacies.sort(
+      (a, b) => (a["distance"] as double).compareTo(b["distance"] as double),
+    );
 
-  double _calculateDistance(
-      double lat1, double lon1, double lat2, double lon2) {
-    const p = 0.017453292519943295;
-    final a = 0.5 -
-        math.cos((lat2 - lat1) * p) / 2 +
-        math.cos(lat1 * p) * math.cos(lat2 * p) * (1 - math.cos((lon2 - lon1) * p)) / 2;
-    return 12742000 * math.asin(math.sqrt(a));
-  }
-
-  String formatDistance(double meters) {
-    if (meters < 1000) return '${meters.toStringAsFixed(0)} m';
-    return '${(meters / 1000).toStringAsFixed(1)} km';
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading || userLocation == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+    if (userLocation == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final filteredPharmacies = searchQuery.isEmpty
-        ? pharmacies
-        : pharmacies
-            .where((p) => p['name']
-                .toString()
-                .toLowerCase()
-                .contains(searchQuery.toLowerCase()))
-            .toList();
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Nearby Pharmacies')),
+      appBar: AppBar(title: const Text("Nearby Pharmacies")),
       body: Column(
         children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search pharmacy...',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (value) {
-                setState(() => searchQuery = value);
-              },
-            ),
-          ),
-
-          // Map showing user + pharmacies
-          SizedBox(
-            height: 250,
+          Expanded(
+            flex: 2,
             child: GoogleMap(
               initialCameraPosition: CameraPosition(
-                target: LatLng(userLocation!.latitude, userLocation!.longitude),
+                target: userLocation!,
                 zoom: 14,
               ),
-              myLocationEnabled: true,
               markers: markers,
-              onMapCreated: (controller) => mapController = controller,
+              onMapCreated: (c) => mapController = c,
             ),
           ),
-
-          const SizedBox(height: 8.0),
-
-          // List of pharmacies
           Expanded(
             child: ListView.builder(
-              itemCount: filteredPharmacies.length,
-              itemBuilder: (context, index) {
-                final pharmacy = filteredPharmacies[index];
-                return Card(
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: ListTile(
-                    title: Text(pharmacy['name']),
-                    subtitle: Text(
-                        '${pharmacy['address']} • ${formatDistance(pharmacy['distance'])} • ${pharmacy['open'] ? 'Open now' : 'Closed'}'),
-                    trailing: Icon(
-                      pharmacy['open'] ? Icons.check_circle : Icons.cancel,
-                      color: pharmacy['open'] ? Colors.green : Colors.red,
-                    ),
-                    onTap: () {
-                      mapController.animateCamera(
-                        CameraUpdate.newLatLng(
-                            LatLng(pharmacy['lat'], pharmacy['lng'])),
-                      );
-                    },
-                  ),
+              itemCount: pharmacies.length,
+              itemBuilder: (_, i) {
+                final p = pharmacies[i];
+                return ListTile(
+                  leading: const Icon(Icons.local_pharmacy),
+                  title: Text(p["name"]),
+                  subtitle: Text("${p["distance"]} km away"),
                 );
               },
             ),

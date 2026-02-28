@@ -16,21 +16,21 @@ class _PharmacyMedicinesPageState extends State<PharmacyMedicinesPage> {
   bool available = true;
 
   void addMedicine() async {
-    var doc = FirebaseFirestore.instance.collection('pharmacies').doc(uid);
-    await doc.set({
-      'name': 'My Pharmacy', // For simplicity, replace with profile name
-      'address': 'Address',  // Replace with profile address
-      'medicines': FieldValue.arrayUnion([
-        {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    await FirebaseFirestore.instance
+        .collection('pharmacies')
+        .doc(uid)
+        .collection('medicines')
+        .add({
           'name': nameController.text,
-          'price': int.parse(priceController.text),
+          'price': double.parse(priceController.text),
           'available': available,
-        }
-      ])
-    }, SetOptions(merge: true));
+          'createdAt': Timestamp.now(),
+        });
+
     nameController.clear();
     priceController.clear();
-    setState(() {}); // refresh
   }
 
   @override
@@ -39,11 +39,20 @@ class _PharmacyMedicinesPageState extends State<PharmacyMedicinesPage> {
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
-          TextField(controller: nameController, decoration: InputDecoration(labelText: 'Medicine Name')),
-          TextField(controller: priceController, decoration: InputDecoration(labelText: 'Price')),
+          TextField(
+            controller: nameController,
+            decoration: InputDecoration(labelText: 'Medicine Name'),
+          ),
+          TextField(
+            controller: priceController,
+            decoration: InputDecoration(labelText: 'Price'),
+          ),
           Row(
             children: [
-              Checkbox(value: available, onChanged: (v) => setState(() => available = v!)),
+              Checkbox(
+                value: available,
+                onChanged: (v) => setState(() => available = v!),
+              ),
               Text('Available'),
             ],
           ),
