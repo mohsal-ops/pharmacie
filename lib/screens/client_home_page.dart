@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';  // ← add this
 import '../services/location_service.dart';
 import '../services/google_places_service.dart';
+import 'login_page.dart'; // ← add this
 
 class ClientHomePage extends StatefulWidget {
   const ClientHomePage({super.key});
@@ -114,18 +116,18 @@ class _ClientHomePageState extends State<ClientHomePage> {
         // Find marker for this pharmacy
         final pharmacyMarker = markers.firstWhere(
           (m) => m.markerId.value == pharmacyId,
-          orElse: () => Marker(
-            markerId: MarkerId(pharmacyId),
-            position: LatLng(0, 0),
-          ),
+          orElse: () =>
+              Marker(markerId: MarkerId(pharmacyId), position: LatLng(0, 0)),
         );
 
-        final distance = Geolocator.distanceBetween(
-          userLocation!.latitude,
-          userLocation!.longitude,
-          pharmacyMarker.position.latitude,
-          pharmacyMarker.position.longitude,
-        ) / 1000;
+        final distance =
+            Geolocator.distanceBetween(
+              userLocation!.latitude,
+              userLocation!.longitude,
+              pharmacyMarker.position.latitude,
+              pharmacyMarker.position.longitude,
+            ) /
+            1000;
 
         // Find open status from nearby pharmacies list if exists
         final openStatus = pharmacies.firstWhere(
@@ -144,9 +146,9 @@ class _ClientHomePageState extends State<ClientHomePage> {
         });
       }
 
-      searchResults.sort((a, b) => (a['distance'] as double)
-          .compareTo(b['distance'] as double));
-
+      searchResults.sort(
+        (a, b) => (a['distance'] as double).compareTo(b['distance'] as double),
+      );
     } catch (e) {
       debugPrint('Search error: $e');
     }
@@ -159,13 +161,26 @@ class _ClientHomePageState extends State<ClientHomePage> {
   @override
   Widget build(BuildContext context) {
     if (userLocation == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Nearby Pharmacies")),
+      appBar: AppBar(
+        title: const Text("Nearby Pharmacies"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Sign Out",
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // 🔍 Search Bar
@@ -206,41 +221,44 @@ class _ClientHomePageState extends State<ClientHomePage> {
             child: searching
                 ? const Center(child: CircularProgressIndicator())
                 : searchResults.isEmpty
-                    ? ListView.builder(
-                        itemCount: pharmacies.length,
-                        itemBuilder: (_, i) {
-                          final p = pharmacies[i];
-                          return ListTile(
-                            leading: const Icon(Icons.local_pharmacy),
-                            title: Text(p["name"]),
-                            subtitle:
-                                Text("${p["distance"].toStringAsFixed(2)} km away"),
-                            trailing: Text(
-                              p["open"] ? "Open" : "Closed",
-                              style: TextStyle(
-                                  color:
-                                      p["open"] ? Colors.green : Colors.red),
-                            ),
-                          );
-                        },
-                      )
-                    : ListView.builder(
-                        itemCount: searchResults.length,
-                        itemBuilder: (context, i) {
-                          final p = searchResults[i];
-                          return ListTile(
-                            leading: const Icon(Icons.local_pharmacy),
-                            title: Text(p['pharmacyId']),
-                            subtitle: Text(
-                                "${p['distance'].toStringAsFixed(2)} km away"),
-                            trailing: Text(
-                              p['open'] ? 'Open' : 'Closed',
-                              style: TextStyle(
-                                  color: p['open'] ? Colors.green : Colors.red),
-                            ),
-                          );
-                        },
-                      ),
+                ? ListView.builder(
+                    itemCount: pharmacies.length,
+                    itemBuilder: (_, i) {
+                      final p = pharmacies[i];
+                      return ListTile(
+                        leading: const Icon(Icons.local_pharmacy),
+                        title: Text(p["name"]),
+                        subtitle: Text(
+                          "${p["distance"].toStringAsFixed(2)} km away",
+                        ),
+                        trailing: Text(
+                          p["open"] ? "Open" : "Closed",
+                          style: TextStyle(
+                            color: p["open"] ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    itemCount: searchResults.length,
+                    itemBuilder: (context, i) {
+                      final p = searchResults[i];
+                      return ListTile(
+                        leading: const Icon(Icons.local_pharmacy),
+                        title: Text(p['pharmacyId']),
+                        subtitle: Text(
+                          "${p['distance'].toStringAsFixed(2)} km away",
+                        ),
+                        trailing: Text(
+                          p['open'] ? 'Open' : 'Closed',
+                          style: TextStyle(
+                            color: p['open'] ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
