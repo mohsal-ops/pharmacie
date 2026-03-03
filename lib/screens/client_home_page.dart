@@ -174,6 +174,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
               if (!mounted) return;
+              // ignore: use_build_context_synchronously
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginPage()),
               );

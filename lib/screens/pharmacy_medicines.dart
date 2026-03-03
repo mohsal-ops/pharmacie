@@ -16,36 +16,41 @@ class _PharmacyMedicinesPageState extends State<PharmacyMedicinesPage> {
   bool available = true;
 
   void addMedicine() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final medicine = {
+      'name': nameController.text,
+      'price': double.tryParse(priceController.text) ?? 0,
+      'available': available,
+    };
 
-    await FirebaseFirestore.instance
-        .collection('pharmacies')
-        .doc(uid)
-        .collection('medicines')
-        .add({
-          'name': nameController.text,
-          'price': double.parse(priceController.text),
-          'available': available,
-          'createdAt': Timestamp.now(),
-        });
+    final docRef = FirebaseFirestore.instance.collection('pharmacies').doc(uid);
+
+    // Add medicine to the medicines array
+    await docRef.update({
+      'medicines': FieldValue.arrayUnion([medicine]),
+    });
 
     nameController.clear();
     priceController.clear();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Medicine added successfully")),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           TextField(
             controller: nameController,
-            decoration: InputDecoration(labelText: 'Medicine Name'),
+            decoration: const InputDecoration(labelText: 'Medicine Name'),
           ),
           TextField(
             controller: priceController,
-            decoration: InputDecoration(labelText: 'Price'),
+            decoration: const InputDecoration(labelText: 'Price'),
+            keyboardType: TextInputType.number,
           ),
           Row(
             children: [
@@ -53,10 +58,10 @@ class _PharmacyMedicinesPageState extends State<PharmacyMedicinesPage> {
                 value: available,
                 onChanged: (v) => setState(() => available = v!),
               ),
-              Text('Available'),
+              const Text('Available'),
             ],
           ),
-          ElevatedButton(onPressed: addMedicine, child: Text('Add Medicine')),
+          ElevatedButton(onPressed: addMedicine, child: const Text('Add Medicine')),
         ],
       ),
     );
