@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';  // ← add this
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../services/location_service.dart';
 import '../services/google_places_service.dart';
-import 'login_page.dart'; // ← add this
+import 'login_page.dart';
 
 class ClientHomePage extends StatefulWidget {
   const ClientHomePage({super.key});
@@ -17,12 +19,17 @@ class ClientHomePage extends StatefulWidget {
 
 class _ClientHomePageState extends State<ClientHomePage> {
   GoogleMapController? mapController;
+
   LatLng? userLocation;
+
   final Set<Marker> markers = {};
+
   final List<Map<String, dynamic>> pharmacies = [];
 
   final TextEditingController searchController = TextEditingController();
+
   bool searching = false;
+
   List<Map<String, dynamic>> searchResults = [];
 
   @override
@@ -36,6 +43,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
     setState(() {
       userLocation = LatLng(pos.latitude, pos.longitude);
+
       markers.add(
         Marker(
           markerId: const MarkerId("me"),
@@ -95,6 +103,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
   Future<void> searchMedicine() async {
     final query = searchController.text.trim();
+
     if (query.isEmpty) return;
 
     setState(() {
@@ -111,9 +120,9 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
+
         final pharmacyId = doc.reference.parent.parent!.id;
 
-        // Find marker for this pharmacy
         final pharmacyMarker = markers.firstWhere(
           (m) => m.markerId.value == pharmacyId,
           orElse: () =>
@@ -129,12 +138,6 @@ class _ClientHomePageState extends State<ClientHomePage> {
             ) /
             1000;
 
-        // Find open status from nearby pharmacies list if exists
-        final openStatus = pharmacies.firstWhere(
-          (p) => p["placeId"] == pharmacyId,
-          orElse: () => {"open": false},
-        )["open"];
-
         searchResults.add({
           'name': data['name'],
           'price': data['price'],
@@ -142,7 +145,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
           'distance': distance,
           'lat': pharmacyMarker.position.latitude,
           'lng': pharmacyMarker.position.longitude,
-          'open': openStatus,
+          'open': true,
         });
       }
 
@@ -158,45 +161,67 @@ class _ClientHomePageState extends State<ClientHomePage> {
     });
   }
 
+  Future<void> openDirections(double lat, double lng) async {
+    final Uri url = Uri.parse(
+        "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (userLocation == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xfff5f7fb),
+
       appBar: AppBar(
-        title: const Text("Nearby Pharmacies"),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        title: const Text("Find Medicines"),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: "Sign Out",
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
+
               if (!mounted) return;
-              // ignore: use_build_context_synchronously
+
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginPage()),
               );
             },
-          ),
+          )
         ],
       ),
+
       body: Column(
         children: [
-          // 🔍 Search Bar
+
+          /// SEARCH BAR
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: TextField(
               controller: searchController,
               decoration: InputDecoration(
-                hintText: 'Search medicine...',
+                hintText: "Search medicine (ex: paracetamol)",
                 prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
                 ),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
+                  icon: const Icon(Icons.arrow_forward),
                   onPressed: searchMedicine,
                 ),
               ),
@@ -204,58 +229,138 @@ class _ClientHomePageState extends State<ClientHomePage> {
             ),
           ),
 
-          // 🗺 Map
-          Expanded(
-            flex: 2,
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: userLocation!,
-                zoom: 14,
+          /// MAP
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.40,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: userLocation!,
+                    zoom: 14,
+                  ),
+                  markers: markers,
+                  onMapCreated: (c) => mapController = c,
+                ),
               ),
-              markers: markers,
-              onMapCreated: (c) => mapController = c,
             ),
           ),
 
-          // 📋 Results list
+          const SizedBox(height: 10),
+
+          /// PHARMACY LIST
           Expanded(
             child: searching
                 ? const Center(child: CircularProgressIndicator())
-                : searchResults.isEmpty
-                ? ListView.builder(
-                    itemCount: pharmacies.length,
-                    itemBuilder: (_, i) {
-                      final p = pharmacies[i];
-                      return ListTile(
-                        leading: const Icon(Icons.local_pharmacy),
-                        title: Text(p["name"]),
-                        subtitle: Text(
-                          "${p["distance"].toStringAsFixed(2)} km away",
-                        ),
-                        trailing: Text(
-                          p["open"] ? "Open" : "Closed",
-                          style: TextStyle(
-                            color: p["open"] ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      );
-                    },
-                  )
                 : ListView.builder(
-                    itemCount: searchResults.length,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    itemCount: searchResults.isEmpty
+                        ? pharmacies.length
+                        : searchResults.length,
                     itemBuilder: (context, i) {
-                      final p = searchResults[i];
-                      return ListTile(
-                        leading: const Icon(Icons.local_pharmacy),
-                        title: Text(p['pharmacyId']),
-                        subtitle: Text(
-                          "${p['distance'].toStringAsFixed(2)} km away",
+                      final p = searchResults.isEmpty
+                          ? pharmacies[i]
+                          : searchResults[i];
+
+                      final bool open = p["open"] ?? true;
+
+                      final double lat = p["lat"];
+                      final double lng = p["lng"];
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              blurRadius: 12,
+                              color: Colors.black.withOpacity(0.05),
+                              offset: const Offset(0, 4),
+                            )
+                          ],
                         ),
-                        trailing: Text(
-                          p['open'] ? 'Open' : 'Closed',
-                          style: TextStyle(
-                            color: p['open'] ? Colors.green : Colors.red,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+
+                            Row(
+                              children: [
+                                const Icon(Icons.local_pharmacy,
+                                    color: Colors.teal),
+
+                                const SizedBox(width: 10),
+
+                                Expanded(
+                                  child: Text(
+                                    p["name"] ?? "Pharmacy",
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: open
+                                        ? Colors.green.withOpacity(.15)
+                                        : Colors.red.withOpacity(.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    open ? "OPEN" : "CLOSED",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          open ? Colors.green : Colors.red,
+                                    ),
+                                  ),
+                                )
+                              ],
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Row(
+                              children: [
+                                const Icon(Icons.location_on,
+                                    size: 18, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "${p["distance"].toStringAsFixed(2)} km away",
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.directions),
+                                label: const Text("Get Directions"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  openDirections(lat, lng);
+                                },
+                              ),
+                            )
+                          ],
                         ),
                       );
                     },
