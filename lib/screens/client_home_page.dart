@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import '../pages/client_profile_page.dart';
 import '../services/location_service.dart';
 import '../services/google_places_service.dart';
 import 'login_page.dart';
@@ -163,7 +163,8 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
   Future<void> openDirections(double lat, double lng) async {
     final Uri url = Uri.parse(
-        "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving");
+      "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving",
+    );
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -173,9 +174,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
   @override
   Widget build(BuildContext context) {
     if (userLocation == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -188,6 +187,17 @@ class _ClientHomePageState extends State<ClientHomePage> {
         title: const Text("Find Medicines"),
         actions: [
           IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: "Profile",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ClientProfilePage()),
+              );
+            },
+          ),
+
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
@@ -198,13 +208,12 @@ class _ClientHomePageState extends State<ClientHomePage> {
                 MaterialPageRoute(builder: (_) => const LoginPage()),
               );
             },
-          )
+          ),
         ],
       ),
 
       body: Column(
         children: [
-
           /// SEARCH BAR
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -280,17 +289,18 @@ class _ClientHomePageState extends State<ClientHomePage> {
                               blurRadius: 12,
                               color: Colors.black.withOpacity(0.05),
                               offset: const Offset(0, 4),
-                            )
+                            ),
                           ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             Row(
                               children: [
-                                const Icon(Icons.local_pharmacy,
-                                    color: Colors.teal),
+                                const Icon(
+                                  Icons.local_pharmacy,
+                                  color: Colors.teal,
+                                ),
 
                                 const SizedBox(width: 10),
 
@@ -306,7 +316,9 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: open
                                         ? Colors.green.withOpacity(.15)
@@ -318,11 +330,10 @@ class _ClientHomePageState extends State<ClientHomePage> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          open ? Colors.green : Colors.red,
+                                      color: open ? Colors.green : Colors.red,
                                     ),
                                   ),
-                                )
+                                ),
                               ],
                             ),
 
@@ -330,8 +341,11 @@ class _ClientHomePageState extends State<ClientHomePage> {
 
                             Row(
                               children: [
-                                const Icon(Icons.location_on,
-                                    size: 18, color: Colors.grey),
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 18,
+                                  color: Colors.grey,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   "${p["distance"].toStringAsFixed(2)} km away",
@@ -349,8 +363,9 @@ class _ClientHomePageState extends State<ClientHomePage> {
                                 label: const Text("Get Directions"),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.teal,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -359,7 +374,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
                                   openDirections(lat, lng);
                                 },
                               ),
-                            )
+                            ),
                           ],
                         ),
                       );

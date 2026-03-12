@@ -4,9 +4,11 @@ import 'firebase_options.dart';
 import 'screens/login_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/profile_page.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(MyApp());
 }
