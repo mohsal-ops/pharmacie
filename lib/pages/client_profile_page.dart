@@ -9,13 +9,28 @@ class ClientProfilePage extends StatefulWidget {
   State<ClientProfilePage> createState() => _ClientProfilePageState();
 }
 
+class Reminder {
+  int id;
+  String medicine;
+  String time;
+
+  Reminder({
+    required this.id,
+    required this.medicine,
+    required this.time,
+  });
+}
+
 class _ClientProfilePageState extends State<ClientProfilePage> {
 
   final TextEditingController medicineName = TextEditingController();
 
   TimeOfDay? selectedTime;
 
+  List<Reminder> reminders = [];
+
   Future pickTime() async {
+
     TimeOfDay? time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -30,17 +45,61 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
 
   Future saveReminder() async {
 
-    if (medicineName.text.isEmpty || selectedTime == null) return;
-
-    await NotificationService.showNotification(
-      id: 1,
-      title: "Medicine Reminder",
-      body: "Time to take ${medicineName.text}",
-    );
-
+  if (medicineName.text.trim().isEmpty || selectedTime == null) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Reminder saved")),
+      const SnackBar(content: Text("Please enter medicine and select time")),
     );
+    return;
+  }
+
+  final now = DateTime.now();
+
+  DateTime scheduledTime = DateTime(
+    now.year,
+    now.month,
+    now.day,
+    selectedTime!.hour,
+    selectedTime!.minute,
+  );
+
+  /// if time already passed today -> schedule tomorrow
+  if (scheduledTime.isBefore(now)) {
+    scheduledTime = scheduledTime.add(const Duration(days: 1));
+  }
+
+  final id = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+  await NotificationService.scheduleNotification(
+    id,
+    "Medicine Reminder",
+    "Time to take ${medicineName.text}",
+    scheduledTime,
+  );
+
+  setState(() {
+    reminders.add(
+      Reminder(
+        id: id,
+        medicine: medicineName.text,
+        time: selectedTime!.format(context),
+      ),
+    );
+  });
+
+  medicineName.clear();
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("Reminder saved successfully")),
+  );
+}
+
+  Future deleteReminder(int id) async {
+
+    await NotificationService.cancelNotification(id);
+
+    setState(() {
+      reminders.removeWhere((r) => r.id == id);
+    });
   }
 
   @override
@@ -106,7 +165,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
 
           const SizedBox(height: 25),
 
-          /// MEDICINE REMINDER SECTION
+          /// REMINDER TITLE
           const Text(
             "Medicine Reminder",
             style: TextStyle(
@@ -117,6 +176,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
 
           const SizedBox(height: 12),
 
+          /// MEDICINE INPUT
           TextField(
             controller: medicineName,
             decoration: InputDecoration(
@@ -125,18 +185,19 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
               fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
               ),
             ),
           ),
 
           const SizedBox(height: 12),
 
+          /// TIME PICKER
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade300),
             ),
             child: Row(
               children: [
@@ -159,6 +220,7 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
 
           const SizedBox(height: 14),
 
+          /// SAVE BUTTON
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -173,7 +235,30 @@ class _ClientProfilePageState extends State<ClientProfilePage> {
 
           const SizedBox(height: 30),
 
-          /// EXTRA FEATURES
+          /// SAVED REMINDERS
+          const Text(
+            "Saved Reminders",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          ...reminders.map((r) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.medication),
+              title: Text(r.medicine),
+              subtitle: Text("Time: ${r.time}"),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => deleteReminder(r.id),
+              ),
+            ),
+          )),
+
+          const SizedBox(height: 20),
 
           ListTile(
             leading: const Icon(Icons.local_pharmacy),
