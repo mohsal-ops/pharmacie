@@ -3,6 +3,8 @@
     package="com.example.pharmacie">
 
     <!-- Permissions -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
@@ -23,8 +25,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <receiver
-    android:exported="false"
-    android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        android:exported="false"
+        android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
 
 <receiver
     android:exported="false"
@@ -34,6 +36,15 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
     </intent-filter>
 </receiver>
+<provider
+    android:name="androidx.core.content.FileProvider"
+    android:authorities="${applicationId}.fileprovider"
+    android:exported="false"
+    android:grantUriPermissions="true">
+    <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/file_paths" />
+</provider>
 
         <!-- Google Maps API Key -->
         <meta-data
@@ -67,3 +78,16 @@
     </application>
 
 </manifest>
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- https://console.firebase.google.com/project/pharmacie-31731/usage/details -->
