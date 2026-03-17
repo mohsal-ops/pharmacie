@@ -22,3 +22,7 @@ ios/.symlinks/
 # OS
 .DS_Store
 Thumbs.db
+
+# Secret keys - never commit these
+.env
+*.env

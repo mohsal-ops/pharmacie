@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class MedicineAnalysisResult {
   final String name;
@@ -26,9 +28,9 @@ class AiMedicineService {
 
   // Your Google Cloud Vision API key
   // Get it from: console.cloud.google.com → APIs → Vision API → Credentials
-  static const String _apiKey = 'AIzaSyDKZ6YTBOZH6ztuOSPp7X-oW5EXWv9_MMM';
+  static final String _apiKey = dotenv.env['VISION_API_KEY'] ?? '';
 
-  static const String _visionUrl =
+  static final String _visionUrl =
     'https://vision.googleapis.com/v1/images:annotate?key=$_apiKey';
 
   static Future<MedicineAnalysisResult> analyzeImage(File imageFile) async {
