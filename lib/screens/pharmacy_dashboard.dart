@@ -1052,15 +1052,29 @@ class _ProfileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, color: const Color(0xFF0F9D58), size: 20),
-      const SizedBox(width: 10),
-      Text(label,
-          style: const TextStyle(color: Colors.grey, fontSize: 13)),
-      const Spacer(),
-      Text(value,
-          style: const TextStyle(
-              fontWeight: FontWeight.w600, fontSize: 14)),
-    ]);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: const Color(0xFF0F9D58), size: 20),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, fontSize: 14),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
   }
 }
