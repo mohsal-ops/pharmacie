@@ -138,7 +138,7 @@ class _DashboardHome extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(child: _StatCard(
                     icon: Icons.check_circle,
-                    label: 'Available',
+                    label: 'Disponible',
                     value: '$availableCount',
                     color: const Color(0xFF1565C0),
                     bg: const Color(0xFFE3F2FD),
@@ -146,7 +146,7 @@ class _DashboardHome extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(child: _StatCard(
                     icon: Icons.remove_circle,
-                    label: 'Out of Stock',
+                    label: 'En rupture de stock',
                     value: '$outOfStock',
                     color: const Color(0xFFE53935),
                     bg: const Color(0xFFFFEBEE),
@@ -165,14 +165,14 @@ class _DashboardHome extends StatelessWidget {
                 Row(children: [
                   Expanded(child: _QuickAction(
                     icon: Icons.add_box,
-                    label: 'Add Medicine',
+                    label: 'Ajouter des médicaments',
                     color: const Color(0xFF0F9D58),
                     onTap: () => _showAddMedicineSheet(context, uid),
                   )),
                   const SizedBox(width: 12),
                   Expanded(child: _QuickAction(
                     icon: Icons.qr_code_scanner,
-                    label: 'Scan Box',
+                    label: 'Scan Boîte',
                     color: const Color(0xFF7B1FA2),
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(
@@ -201,7 +201,7 @@ class _DashboardHome extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Recent Medicines',
+                    const Text('Médicaments récents',
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -229,9 +229,9 @@ class _DashboardHome extends StatelessWidget {
 
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return 'morning';
-    if (h < 17) return 'afternoon';
-    return 'evening';
+    if (h < 12) return 'Bonjour';
+    if (h < 17) return 'Bon après-midi';
+    return 'Bonsoir';
   }
 
   static void _showAddMedicineSheet(BuildContext context, String uid) {
@@ -273,7 +273,7 @@ class _MedicineInventoryPageState extends State<_MedicineInventoryPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Inventory',
+                const Text('Inventaire',
                     style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -283,7 +283,7 @@ class _MedicineInventoryPageState extends State<_MedicineInventoryPage> {
                   controller: _searchCtrl,
                   onChanged: (v) => setState(() => _query = v.toLowerCase()),
                   decoration: InputDecoration(
-                    hintText: 'Search medicines...',
+                    hintText: 'Rechercher un médicament...',
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
                     filled: true,
                     fillColor: const Color(0xFFF0F4F8),
@@ -309,7 +309,7 @@ class _MedicineInventoryPageState extends State<_MedicineInventoryPage> {
                 final data =
                     snapshot.data?.data() as Map<String, dynamic>?;
                 final all =
-                    (data?['medicines'] as List<dynamic>? ?? []);
+                    (data?['médicaments'] as List<dynamic>? ?? []);
                 final filtered = _query.isEmpty
                     ? all
                     : all.where((m) => (m['name'] as String)
@@ -383,7 +383,7 @@ class _PharmacyProfilePage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           final data = snapshot.data?.data() as Map<String, dynamic>?;
-          final name    = data?['name']    as String? ?? 'Your Pharmacy';
+          final name    = data?['name']    as String? ?? 'Votre pharmacie';
           final address = data?['address'] as String? ?? 'No address';
           final email   = data?['ownerEmail'] as String? ?? '';
           final isOpen  = data?['open'] as bool? ?? false;
@@ -420,9 +420,9 @@ class _PharmacyProfilePage extends StatelessWidget {
                   _ProfileRow(Icons.location_on, 'Address', address),
                   const Divider(height: 20),
                   _ProfileRow(Icons.medication,
-                      'Total Medicines', '${meds.length}'),
+                      'Médicaments totaux', '${meds.length}'),
                   const Divider(height: 20),
-                  _ProfileRow(Icons.check_circle, 'Available',
+                  _ProfileRow(Icons.check_circle, 'Disponible',
                       '${meds.where((m) => m['available'] == true).length}'),
                 ]),
 
@@ -437,14 +437,14 @@ class _PharmacyProfilePage extends StatelessWidget {
                         Icon(Icons.storefront,
                             color: Color(0xFF0F9D58)),
                         SizedBox(width: 10),
-                        Text('Pharmacy Status',
+                        Text('Statut de la pharmacie',
                             style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15)),
                       ]),
                       Switch(
                         value: isOpen,
-                        activeColor: const Color(0xFF0F9D58),
+                        activeThumbColor: const Color(0xFF0F9D58),
                         onChanged: (v) => FirebaseFirestore.instance
                             .collection('pharmacies')
                             .doc(uid)
@@ -505,7 +505,7 @@ class _StatusToggle extends StatelessWidget {
       onTap: () => FirebaseFirestore.instance
           .collection('pharmacies')
           .doc(uid)
-          .update({'open': !isOpen}),
+          .update({'ouvert': !isOpen}),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -531,7 +531,7 @@ class _StatusToggle extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isOpen ? 'OPEN' : 'CLOSED',
+            isOpen ? 'ouvert' : 'fermé',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 12,
@@ -776,7 +776,7 @@ class _InventoryCard extends StatelessWidget {
     await FirebaseFirestore.instance
         .collection('pharmacies')
         .doc(uid)
-        .update({'medicines': updated});
+        .update({'médicaments': updated});
   }
 
   void _confirmDelete(BuildContext context) {
@@ -785,9 +785,9 @@ class _InventoryCard extends StatelessWidget {
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18)),
-        title: const Text('Delete Medicine'),
+        title: const Text('Supprimer le médicament'),
         content:
-            Text('Remove "${medicine['name']}" from your inventory?'),
+            Text('Retirer "${medicine['name']}" de votre inventaire?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -847,30 +847,30 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Add New Medicine',
+          const Text('Ajouter un médicament',
               style: TextStyle(
                   fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
           _SheetField(
               controller: _nameCtrl,
-              label: 'Medicine Name',
+              label: 'Nom du médicament',
               icon: Icons.medication),
           const SizedBox(height: 14),
           _SheetField(
               controller: _priceCtrl,
-              label: 'Price (DA)',
+              label: 'Prix (DA)',
               icon: Icons.attach_money,
               keyboardType: TextInputType.number),
           const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Available in stock',
+              const Text('Disponible en stock',
                   style: TextStyle(
                       fontWeight: FontWeight.w500, fontSize: 15)),
               Switch(
                 value: _available,
-                activeColor: const Color(0xFF0F9D58),
+                activeThumbColor: const Color(0xFF0F9D58),
                 onChanged: (v) => setState(() => _available = v),
               ),
             ],
@@ -891,7 +891,7 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
                       width: 20, height: 20,
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
-                  : const Text('Add Medicine',
+                  : const Text('Ajouter le médicament',
                       style: TextStyle(fontSize: 15)),
             ),
           ),
@@ -908,7 +908,7 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
     if (name.isEmpty || price == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill all fields correctly')),
+            content: Text('Veuillez remplir tous les champs correctement')),
       );
       return;
     }
@@ -928,7 +928,7 @@ class _AddMedicineSheetState extends State<_AddMedicineSheet> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('$name added successfully ✅'),
+            content: Text('$name ajouté avec succès✅'),
             backgroundColor: const Color(0xFF0F9D58)),
       );
     }
@@ -982,12 +982,12 @@ class _EmptyInventory extends StatelessWidget {
         Icon(Icons.inventory_2_outlined,
             size: 72, color: Colors.grey.shade300),
         const SizedBox(height: 12),
-        const Text('No medicines yet',
+        const Text('Aucun médicament pour le moment',
             style: TextStyle(fontSize: 16, color: Colors.grey)),
         const SizedBox(height: 16),
         ElevatedButton.icon(
           icon: const Icon(Icons.add),
-          label: const Text('Add your first medicine'),
+          label: const Text('Ajouter votre premier médicament'),
           style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0F9D58)),
           onPressed: onAdd,
@@ -1012,7 +1012,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        isOpen ? '● OPEN' : '● CLOSED',
+        isOpen ? '● OUVERT' : '● FERMÉ',
         style: TextStyle(
             fontWeight: FontWeight.bold,
             color: isOpen

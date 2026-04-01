@@ -13,6 +13,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  bool _obscurePassword = true;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final locationController = TextEditingController();
@@ -32,15 +33,17 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> login() async {
     setState(() => isLoading = true);
     try {
-      UserCredential cred =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      UserCredential cred = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
       final uid = cred.user!.uid;
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
 
       final userRole = doc.data()?['role'];
 
@@ -55,16 +58,15 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login failed")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Login failed")));
     }
     setState(() => isLoading = false);
   }
 
   Future<void> signup() async {
-    if (role == 'pharmacy' &&
-        (selectedLat == null || selectedLng == null)) {
+    if (role == 'pharmacy' && (selectedLat == null || selectedLng == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select pharmacy location")),
       );
@@ -74,11 +76,11 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => isLoading = true);
 
     try {
-      UserCredential cred =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      UserCredential cred = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
       final uid = cred.user!.uid;
 
@@ -106,54 +108,46 @@ class _LoginPageState extends State<LoginPage> {
 
       setState(() => isLogin = true);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Signup failed")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Signup failed")));
     }
 
     setState(() => isLoading = false);
   }
 
- Widget buildInput({
-  required TextEditingController controller,
-  required String hint,
-  required IconData icon,
-  bool obscure = false,
-}) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 18),
-    child: TextField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
+  Widget buildInput({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: TextField(
+        controller: controller,
+        obscureText: obscure,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon),
+          hintText: hint,
+          filled: true,
+          fillColor: Colors.white,
 
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(
-            color: Color(0xFFE0E0E0),
-            width: 1.4,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1.4),
           ),
-        ),
 
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(
-            color: Color(0xFF0F9D58),
-            width: 2,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFF0F9D58), width: 2),
           ),
-        ),
 
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,10 +155,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF0F9D58),
-              Color(0xFF34A853),
-            ],
+            colors: [Color(0xFF0F9D58), Color(0xFF34A853)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -183,15 +174,17 @@ class _LoginPageState extends State<LoginPage> {
                       blurRadius: 20,
                       color: Colors.black12,
                       offset: Offset(0, 10),
-                    )
+                    ),
                   ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-
-                    const Icon(Icons.local_pharmacy,
-                        size: 60, color: Color(0xFF0F9D58)),
+                    const Icon(
+                      Icons.local_pharmacy,
+                      size: 60,
+                      color: Color(0xFF0F9D58),
+                    ),
 
                     const SizedBox(height: 12),
 
@@ -211,11 +204,49 @@ class _LoginPageState extends State<LoginPage> {
                       icon: Icons.email_outlined,
                     ),
 
-                    buildInput(
-                      controller: passwordController,
-                      hint: "Password",
-                      icon: Icons.lock_outline,
-                      obscure: true,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: TextField(
+                        controller: passwordController,
+                        obscureText: _obscurePassword,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          hintText: "Password",
+                          filled: true,
+                          fillColor: Colors.white,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE0E0E0),
+                              width: 1.4,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0F9D58),
+                              width: 2,
+                            ),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          // ── The eye icon ─────────────────────────────────────
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () {
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ),
 
                     if (!isLogin) ...[
@@ -223,14 +254,10 @@ class _LoginPageState extends State<LoginPage> {
 
                       ToggleButtons(
                         borderRadius: BorderRadius.circular(14),
-                        isSelected: [
-                          role == 'client',
-                          role == 'pharmacy',
-                        ],
+                        isSelected: [role == 'client', role == 'pharmacy'],
                         onPressed: (index) {
                           setState(() {
-                            role =
-                                index == 0 ? 'client' : 'pharmacy';
+                            role = index == 0 ? 'client' : 'pharmacy';
                           });
                         },
                         children: const [
@@ -255,31 +282,27 @@ class _LoginPageState extends State<LoginPage> {
                         googleAPIKey: googleApiKey,
                         inputDecoration: InputDecoration(
                           hintText: "Search your pharmacy",
-                          prefixIcon:
-                              const Icon(Icons.location_on_outlined),
+                          prefixIcon: const Icon(Icons.location_on_outlined),
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide.none,
                           ),
                         ),
                         debounceTime: 800,
                         isLatLngRequired: true,
                         getPlaceDetailWithLatLng: (prediction) {
-                          selectedLat =
-                              double.parse(prediction.lat ?? "0");
-                          selectedLng =
-                              double.parse(prediction.lng ?? "0");
+                          selectedLat = double.parse(prediction.lat ?? "0");
+                          selectedLng = double.parse(prediction.lng ?? "0");
                         },
                         itemClick: (prediction) {
                           locationController.text =
                               prediction.description ?? "";
                           locationFocus.requestFocus();
                           selectedAddress = prediction.description;
-                          selectedName = prediction
-                              .structuredFormatting?.mainText;
+                          selectedName =
+                              prediction.structuredFormatting?.mainText;
                         },
                       ),
 
@@ -292,15 +315,16 @@ class _LoginPageState extends State<LoginPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0F9D58),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(18),
                           ),
                         ),
-                        onPressed:
-                            isLoading ? null : (isLogin ? login : signup),
+                        onPressed: isLoading
+                            ? null
+                            : (isLogin ? login : signup),
                         child: isLoading
                             ? const CircularProgressIndicator(
-                                color: Colors.white)
+                                color: Colors.white,
+                              )
                             : Text(
                                 isLogin ? "Login" : "Create Account",
                                 style: const TextStyle(fontSize: 16),
@@ -311,8 +335,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 10),
 
                     TextButton(
-                      onPressed: () =>
-                          setState(() => isLogin = !isLogin),
+                      onPressed: () => setState(() => isLogin = !isLogin),
                       child: Text(
                         isLogin
                             ? "Create an account"
