@@ -68,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> signup() async {
     if (role == 'pharmacy' && (selectedLat == null || selectedLng == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select pharmacy location")),
+        const SnackBar(content: Text("Veuillez sélectionner l'emplacement de la pharmacie")),
       );
       return;
     }
@@ -281,7 +281,7 @@ class _LoginPageState extends State<LoginPage> {
                         focusNode: locationFocus,
                         googleAPIKey: googleApiKey,
                         inputDecoration: InputDecoration(
-                          hintText: "Search your pharmacy",
+                          hintText: "Recherchez votre pharmacie",
                           prefixIcon: const Icon(Icons.location_on_outlined),
                           filled: true,
                           fillColor: Colors.white,
@@ -326,7 +326,7 @@ class _LoginPageState extends State<LoginPage> {
                                 color: Colors.white,
                               )
                             : Text(
-                                isLogin ? "Login" : "Create Account",
+                                isLogin ? "Login" : "Créer",
                                 style: const TextStyle(fontSize: 16),
                               ),
                       ),
@@ -338,8 +338,8 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () => setState(() => isLogin = !isLogin),
                       child: Text(
                         isLogin
-                            ? "Create an account"
-                            : "Already have an account?",
+                            ? "Créer un compte"
+                            : "Vous avez déjà un compte?",
                       ),
                     ),
                   ],

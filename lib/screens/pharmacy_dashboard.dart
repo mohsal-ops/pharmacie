@@ -106,7 +106,7 @@ class _DashboardHome extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Good ${_greeting()} 👋',
+                          '${_greeting()} 👋',
                           style: const TextStyle(
                               fontSize: 14, color: Colors.grey),
                         ),
@@ -531,7 +531,7 @@ class _StatusToggle extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isOpen ? 'ouvert' : 'fermé',
+            isOpen ? 'OUVERT' : 'FERMÉ',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 12,
