@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// ── Result model ─────────────────────────────────────────────────────────────
 class MedicineAnalysisResult {
   final String name;
   final String dosage;
@@ -28,21 +28,18 @@ class MedicineAnalysisResult {
   });
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 class MedicineScannerPage extends StatefulWidget {
   const MedicineScannerPage({super.key});
-
   @override
   State<MedicineScannerPage> createState() => _MedicineScannerPageState();
 }
 
 class _MedicineScannerPageState extends State<MedicineScannerPage> {
-  // ── State ──────────────────────────────────────────────────────────────────
-  final List<File> _images = [];        // multiple images
+  final List<File> _images = [];
   MedicineAnalysisResult? _result;
-  bool _loading  = false;
-  bool _saving   = false;
-  bool _saved    = false;
+  bool _loading = false;
+  bool _saving  = false;
+  bool _saved   = false;
   String? _error;
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _priceController = TextEditingController();
@@ -51,7 +48,28 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
   static const String _visionUrl =
       'https://vision.googleapis.com/v1/images:annotate';
 
-  // ── Pick from camera ────────────────────────────────────────────────────────
+  // ── Crop image after picking ───────────────────────────────────────────────
+  Future<File?> _cropImage(String filePath) async {
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: filePath,
+      compressQuality: 85,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Recadrer la boîte',
+          toolbarColor: const Color(0xFF0F9D58),
+          toolbarWidgetColor: Colors.white,
+          activeControlsWidgetColor: const Color(0xFF0F9D58),
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+          hideBottomControls: false,
+        ),
+      ],
+    );
+    if (croppedFile == null) return null;
+    return File(croppedFile.path);
+  }
+
+  // ── Pick from camera then crop ─────────────────────────────────────────────
   Future<void> _pickFromCamera() async {
     final XFile? file = await _picker.pickImage(
       source: ImageSource.camera,
@@ -59,33 +77,42 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
       maxWidth: 1200,
     );
     if (file == null) return;
+
+    // ── Open cropper immediately after capture ─────────────────────────────
+    final cropped = await _cropImage(file.path);
+    if (cropped == null) return; // user cancelled crop
+
     setState(() {
-      _images.add(File(file.path));
+      _images.add(cropped);
       _result = null;
       _error  = null;
       _saved  = false;
     });
   }
 
-  // ── Pick from gallery ───────────────────────────────────────────────────────
+  // ── Pick from gallery then crop ────────────────────────────────────────────
   Future<void> _pickFromGallery() async {
-    // Allows picking MULTIPLE images at once from gallery
     final List<XFile> files = await _picker.pickMultiImage(
       imageQuality: 85,
-      limit: 6,   // max 6 images total
+      limit: 6,
     );
     if (files.isEmpty) return;
-    setState(() {
-      for (var f in files) {
-        if (_images.length < 6) _images.add(File(f.path));
+
+    // Crop each selected image one by one
+    for (var f in files) {
+      if (_images.length >= 6) break;
+      final cropped = await _cropImage(f.path);
+      if (cropped != null) {
+        setState(() {
+          _images.add(cropped);
+          _result = null;
+          _error  = null;
+          _saved  = false;
+        });
       }
-      _result = null;
-      _error  = null;
-      _saved  = false;
-    });
+    }
   }
 
-  // ── Remove one image ────────────────────────────────────────────────────────
   void _removeImage(int index) {
     setState(() {
       _images.removeAt(index);
@@ -94,19 +121,17 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
     });
   }
 
-  // ── Analyze ALL images ──────────────────────────────────────────────────────
+  // ── Analyze all images ─────────────────────────────────────────────────────
   Future<void> _analyze() async {
     if (_images.isEmpty) return;
     setState(() { _loading = true; _error = null; _saved = false; });
 
     try {
-      // Build one request with one entry per image
       final List<Map<String, dynamic>> requests = [];
 
       for (final image in _images) {
         final bytes     = await image.readAsBytes();
         final base64Str = base64Encode(bytes);
-
         requests.add({
           'image': {'content': base64Str},
           'features': [
@@ -116,7 +141,6 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
         });
       }
 
-      // Send all images in ONE request
       final response = await http.post(
         Uri.parse('$_visionUrl?key=$_apiKey'),
         headers: {'Content-Type': 'application/json'},
@@ -128,55 +152,43 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
             'Vision API error ${response.statusCode}: ${response.body}');
       }
 
-      final json      = jsonDecode(response.body);
-      final responses = json['responses'] as List;
+      final jsonResp  = jsonDecode(response.body);
+      final responses = jsonResp['responses'] as List;
 
-      // ── Merge all text from all images ─────────────────────────────────────
       final StringBuffer allTextBuffer = StringBuffer();
       final Set<String>  allLabels     = {};
 
       for (final r in responses) {
         final textAnnotations  = r['textAnnotations']  as List? ?? [];
         final labelAnnotations = r['labelAnnotations'] as List? ?? [];
-
         if (textAnnotations.isNotEmpty) {
-          // First annotation = full text block for this image
           allTextBuffer.writeln(textAnnotations[0]['description'] ?? '');
         }
-
         for (final l in labelAnnotations) {
           allLabels.add(l['description'] as String);
         }
       }
 
-      // ── Combined text from all images ──────────────────────────────────────
       final String fullText = allTextBuffer.toString();
-
       final lines = fullText
           .split('\n')
           .map((l) => l.trim())
           .where((l) => l.length > 1)
           .toList();
 
-      // ── Parse medicine info ────────────────────────────────────────────────
+      final medicineName = lines.isNotEmpty ? lines[0] : 'Inconnu';
 
-      // Name — first non-empty line
-      final medicineName = lines.isNotEmpty ? lines[0] : 'Unknown';
-
-      // Dosage — regex for 500mg, 250 mg, 10ml etc.
       final dosageRegex = RegExp(
           r'(\d+\.?\d*\s?(mg|g|ml|mcg|IU))', caseSensitive: false);
       final dosageMatch = dosageRegex.firstMatch(fullText);
       final dosage      = dosageMatch?.group(0) ?? 'Non détecté';
 
-      // Expiry — EXP 12/2026, use before, best before
       final expiryRegex = RegExp(
           r'(exp|expiry|expires?|use before|best before|peremption|perem)[:\s]*([\d\/\-\.]+)',
           caseSensitive: false);
       final expiryMatch = expiryRegex.firstMatch(fullText);
       final expiry      = expiryMatch?.group(2) ?? 'Non détecté';
 
-      // Manufacturer — keywords in any language
       final mfgKeywords = [
         'laboratoire', 'lab', 'pharma', 'manufactured',
         'mfg', 'sanofi', 'bayer', 'pfizer', 'novartis',
@@ -198,7 +210,6 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
           rawText:      fullText,
         );
       });
-
     } catch (e) {
       setState(() { _error = e.toString(); });
     } finally {
@@ -206,58 +217,41 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
     }
   }
 
-  // ── Save medicine to Firestore ──────────────────────────────────────────────
+  // ── Save to Firestore ──────────────────────────────────────────────────────
   Future<void> _saveToPharmacy() async {
     if (_result == null) return;
-
     final price = double.tryParse(_priceController.text.trim());
     if (price == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Veuillez saisir un prix valide')),
-      );
+        const SnackBar(content: Text('Veuillez saisir un prix valide')));
       return;
     }
-
     setState(() => _saving = true);
-
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-
       await FirebaseFirestore.instance
           .collection('pharmacies')
           .doc(uid)
           .update({
         'medicines': FieldValue.arrayUnion([
-          {
-            'name':      _result!.name,
-            'price':     price,
-            'available': true,
-          }
+          {'name': _result!.name, 'price': price, 'available': true}
         ]),
       });
-
       setState(() => _saved = true);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_result!.name} ajouté à votre pharmacie ✅'),
-          backgroundColor: Colors.teal,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${_result!.name} ajouté ✅'),
+        backgroundColor: Colors.teal,
+      ));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur: $e'),
+        backgroundColor: Colors.red,
+      ));
     } finally {
       setState(() => _saving = false);
     }
   }
 
-  // ── Reset everything ────────────────────────────────────────────────────────
   void _reset() {
     setState(() {
       _images.clear();
@@ -268,7 +262,7 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
     });
   }
 
-  // ── UI ──────────────────────────────────────────────────────────────────────
+  // ── UI ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -294,22 +288,23 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
 
-            // ── INSTRUCTIONS ───────────────────────────────────────────
+            // ── Info banner ────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFE3F2FD),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1565C0).withOpacity(0.3)),
+                border: Border.all(
+                    color: const Color(0xFF1565C0).withOpacity(0.3)),
               ),
-              child: Row(children: [
-                const Icon(Icons.info_outline,
-                    color: Color(0xFF1565C0), size: 20),
-                const SizedBox(width: 10),
-                const Expanded(
+              child: const Row(children: [
+                Icon(Icons.crop, color: Color(0xFF1565C0), size: 20),
+                SizedBox(width: 10),
+                Expanded(
                   child: Text(
-                    'Vous pouvez ajouter jusqu\'à 6 photos de la boîte '
-                    '(avant, arrière, côtés) pour une meilleure détection.',
+                    'Après chaque photo, recadrez pour ne garder '
+                    'que la face de la boîte. Cela améliore '
+                    'la précision de la détection.',
                     style: TextStyle(
                         fontSize: 13, color: Color(0xFF1565C0)),
                   ),
@@ -319,9 +314,8 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
 
             const SizedBox(height: 16),
 
-            // ── IMAGE GRID ─────────────────────────────────────────────
+            // ── Image grid ─────────────────────────────────────────────
             if (_images.isEmpty)
-              // Empty state
               Container(
                 height: 180,
                 decoration: BoxDecoration(
@@ -338,12 +332,17 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                     const SizedBox(height: 8),
                     Text('Aucune photo ajoutée',
                         style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 14)),
+                            color: Colors.grey.shade500,
+                            fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Text('La photo sera recadrée après capture',
+                        style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 12)),
                   ],
                 ),
               )
             else
-              // Grid of selected images
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -356,7 +355,6 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                 itemCount: _images.length,
                 itemBuilder: (context, index) {
                   return Stack(children: [
-                    // Image thumbnail
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.file(
@@ -364,6 +362,31 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
+                      ),
+                    ),
+                    // Cropped badge
+                    Positioned(
+                      top: 4, left: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F9D58),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.crop, color: Colors.white,
+                                size: 10),
+                            SizedBox(width: 2),
+                            Text('OK',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                     ),
                     // Remove button
@@ -374,15 +397,14 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
+                              color: Colors.red,
+                              shape: BoxShape.circle),
                           child: const Icon(Icons.close,
                               color: Colors.white, size: 14),
                         ),
                       ),
                     ),
-                    // Image number badge
+                    // Face number
                     Positioned(
                       bottom: 4, left: 4,
                       child: Container(
@@ -392,11 +414,9 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          'Face ${index + 1}',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 10),
-                        ),
+                        child: Text('Face ${index + 1}',
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 10)),
                       ),
                     ),
                   ]);
@@ -405,7 +425,7 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
 
             const SizedBox(height: 14),
 
-            // ── ADD PHOTO BUTTONS ──────────────────────────────────────
+            // ── Buttons ────────────────────────────────────────────────
             Row(children: [
               Expanded(
                 child: ElevatedButton.icon(
@@ -413,11 +433,13 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                   label: const Text('Caméra'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: _images.length >= 6 ? null : _pickFromCamera,
+                  onPressed:
+                      _images.length >= 6 ? null : _pickFromCamera,
                 ),
               ),
               const SizedBox(width: 10),
@@ -427,22 +449,23 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                   label: const Text('Galerie'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueGrey,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: _images.length >= 6 ? null : _pickFromGallery,
+                  onPressed:
+                      _images.length >= 6 ? null : _pickFromGallery,
                 ),
               ),
             ]),
 
-            // Photos counter
             if (_images.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  '${_images.length}/6 photo(s) ajoutée(s)'
-                  '${_images.length >= 6 ? " — maximum atteint" : " — vous pouvez en ajouter d\'autres"}',
+                  '${_images.length}/6 photo(s) — '
+                  '${_images.length >= 6 ? "maximum atteint" : "vous pouvez en ajouter d\'autres"}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -455,7 +478,7 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
 
             const SizedBox(height: 14),
 
-            // ── ANALYZE BUTTON ─────────────────────────────────────────
+            // ── Analyze button ─────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -473,13 +496,13 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: (_images.isEmpty || _loading) ? null : _analyze,
+                onPressed:
+                    (_images.isEmpty || _loading) ? null : _analyze,
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // ── LOADING ────────────────────────────────────────────────
             if (_loading)
               Column(children: [
                 const CircularProgressIndicator(
@@ -487,13 +510,12 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                 const SizedBox(height: 10),
                 Text(
                   _images.length > 1
-                      ? 'Analyse de ${_images.length} photos en cours...'
+                      ? 'Analyse de ${_images.length} photos...'
                       : 'Analyse en cours...',
                   style: const TextStyle(color: Colors.grey),
                 ),
               ]),
 
-            // ── ERROR ──────────────────────────────────────────────────
             if (_error != null)
               Container(
                 padding: const EdgeInsets.all(14),
@@ -506,7 +528,6 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                     style: const TextStyle(color: Colors.red)),
               ),
 
-            // ── RESULTS ───────────────────────────────────────────────
             if (_result != null) ...[
               _buildResultCard(_result!),
               const SizedBox(height: 16),
@@ -518,25 +539,21 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
     );
   }
 
-  // ── Result card ─────────────────────────────────────────────────────────────
   Widget _buildResultCard(MedicineAnalysisResult r) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 12,
-            color: Colors.black.withOpacity(0.06),
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(
+          blurRadius: 12,
+          color: Colors.black.withOpacity(0.06),
+          offset: const Offset(0, 4),
+        )],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -548,13 +565,10 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                   color: Color(0xFF0F9D58), size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Résultat de l\'analyse',
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            const Text('Résultat de l\'analyse',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
             const Spacer(),
-            // How many images were used
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 8, vertical: 4),
@@ -562,25 +576,19 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                 color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '${_images.length} photo(s)',
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF0F9D58),
-                    fontWeight: FontWeight.w600),
-              ),
+              child: Text('${_images.length} photo(s)',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF0F9D58),
+                      fontWeight: FontWeight.w600)),
             ),
           ]),
-
           const Divider(height: 24),
-
-          _infoRow(Icons.medication,     'Nom',         r.name),
-          _infoRow(Icons.science,        'Dosage',      r.dosage),
-          _infoRow(Icons.calendar_today, 'Péremption',  r.expiry),
-          _infoRow(Icons.business,       'Fabricant',   r.manufacturer),
-
+          _infoRow(Icons.medication,     'Nom',        r.name),
+          _infoRow(Icons.science,        'Dosage',     r.dosage),
+          _infoRow(Icons.calendar_today, 'Péremption', r.expiry),
+          _infoRow(Icons.business,       'Fabricant',  r.manufacturer),
           const SizedBox(height: 12),
-
           if (r.labels.isNotEmpty) ...[
             const Text('Étiquettes détectées :',
                 style: TextStyle(
@@ -604,20 +612,14 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
                   .toList(),
             ),
           ],
-
           const SizedBox(height: 8),
-
-          // All detected lines expandable
           ExpansionTile(
-            title: const Text(
-              'Tout le texte détecté',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
+            title: const Text('Tout le texte détecté',
+                style: TextStyle(fontSize: 13, color: Colors.grey)),
             children: r.allLines
                 .map((line) => ListTile(
                       dense: true,
-                      leading: const Icon(Icons.text_fields,
-                          size: 14),
+                      leading: const Icon(Icons.text_fields, size: 14),
                       title: Text(line,
                           style: const TextStyle(fontSize: 13)),
                     ))
@@ -628,7 +630,6 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
     );
   }
 
-  // ── Save section ─────────────────────────────────────────────────────────────
   Widget _buildSaveSection() {
     if (_saved) {
       return Container(
@@ -641,11 +642,9 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
         child: const Row(children: [
           Icon(Icons.check_circle, color: Colors.teal),
           SizedBox(width: 10),
-          Text(
-            'Médicament ajouté à votre pharmacie !',
-            style: TextStyle(
-                color: Colors.teal, fontWeight: FontWeight.w600),
-          ),
+          Text('Médicament ajouté à votre pharmacie !',
+              style: TextStyle(
+                  color: Colors.teal, fontWeight: FontWeight.w600)),
         ]),
       );
     }
@@ -655,22 +654,18 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 12,
-            color: Colors.black.withOpacity(0.06),
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: [BoxShadow(
+          blurRadius: 12,
+          color: Colors.black.withOpacity(0.06),
+          offset: const Offset(0, 4),
+        )],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Ajouter à votre pharmacie',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          const Text('Ajouter à votre pharmacie',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 14),
           TextField(
             controller: _priceController,
@@ -699,13 +694,13 @@ class _MedicineScannerPageState extends State<MedicineScannerPage> {
             child: ElevatedButton.icon(
               icon: _saving
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 18, height: 18,
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
                   : const Icon(Icons.save),
-              label:
-                  Text(_saving ? 'Enregistrement...' : 'Ajouter à la pharmacie'),
+              label: Text(_saving
+                  ? 'Enregistrement...'
+                  : 'Ajouter à la pharmacie'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F9D58),
                 padding: const EdgeInsets.symmetric(vertical: 14),

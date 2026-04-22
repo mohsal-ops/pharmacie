@@ -776,7 +776,7 @@ class _InventoryCard extends StatelessWidget {
     await FirebaseFirestore.instance
         .collection('pharmacies')
         .doc(uid)
-        .update({'médicaments': updated});
+        .update({'medicines': updated});
   }
 
   void _confirmDelete(BuildContext context) {
