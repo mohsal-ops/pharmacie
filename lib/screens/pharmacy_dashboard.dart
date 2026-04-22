@@ -309,7 +309,7 @@ class _MedicineInventoryPageState extends State<_MedicineInventoryPage> {
                 final data =
                     snapshot.data?.data() as Map<String, dynamic>?;
                 final all =
-                    (data?['médicaments'] as List<dynamic>? ?? []);
+                    (data?['medicines'] as List<dynamic>? ?? []);
                 final filtered = _query.isEmpty
                     ? all
                     : all.where((m) => (m['name'] as String)
